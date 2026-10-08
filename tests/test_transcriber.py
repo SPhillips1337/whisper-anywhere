@@ -17,7 +17,7 @@ class FakeModelManager:
     def is_model_ready(self) -> bool:
         return False
 
-    def mark_model_ready(self) -> None:
+    def mark_model_ready(self, model_name: str | None = None) -> None:
         self.ready_marks += 1
 
     def selected_model(self) -> str:
@@ -185,3 +185,40 @@ def test_transcribe_retries_on_cpu_when_gpu_transcription_fails(
     )
     assert transcriber._model is None
     assert transcriber._loaded_key is None
+
+
+def test_yapsnap_selection_uses_cpu_backend_and_marks_it_ready(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from core.yapsnap_backend import YapSnapBackend
+
+    audio_path = tmp_path / "recording.wav"
+    import wave
+
+    with wave.open(str(audio_path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(16_000)
+        wav_file.writeframes((b"\x00\x04") * 16_000)
+
+    backend_calls = []
+    fake_yapsnap = SimpleNamespace(
+        LANG_MODELS={"en": "model-en"},
+        FALLBACK_LANG="en",
+        ensure_model=lambda repo: repo,
+        transcribe=lambda samples, model_dir, **kwargs: (
+            backend_calls.append((samples, model_dir, kwargs)) or "  hello   world  "
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "yapsnap", fake_yapsnap)
+    monkeypatch.setattr(YapSnapBackend, "_detect_language", lambda *args: "en")
+
+    manager = FakeModelManager("yapsnap")
+    transcriber = Transcriber(manager)
+    text = transcriber.transcribe(str(audio_path), make_settings(tmp_path))
+
+    assert text == "hello world"
+    assert manager.ready_marks == 1
+    assert backend_calls[0][1] == "model-en"
+    assert backend_calls[0][2] == {"timestamps": False, "speed": 1.4}
+    assert transcriber.runtime_message == "YapSnap CPU transcription."

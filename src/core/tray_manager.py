@@ -60,7 +60,7 @@ class TrayManager(QObject):
         model_menu = menu.addMenu("Current model")
         selected = self.model_manager.selected_model()
         for info in self.model_manager.models():
-            action = QAction(info.name, self)
+            action = QAction(info.label, self)
             action.setCheckable(True)
             action.setChecked(info.name == selected)
             action.triggered.connect(

@@ -16,27 +16,8 @@ Write-Host "Installing build dependencies..."
 & $Python -m pip install -r requirements.txt
 
 Write-Host "Building Whisper Anywhere.exe..."
-& $Python -m PyInstaller `
-    --noconfirm `
-    --clean `
-    --windowed `
-    --onedir `
-    --name "Whisper Anywhere" `
-    --icon "assets\icon.ico" `
-    --paths "src" `
-    --add-data "assets\icon.ico;assets" `
-    --add-data "assets\icon.png;assets" `
-    --add-data "assets\sounds;assets\sounds" `
-    --collect-all faster_whisper `
-    --collect-all ctranslate2 `
-    --collect-all av `
-    --collect-all sounddevice `
-    --collect-all PySide6.QtMultimedia `
-    --hidden-import win32timezone `
-    --hidden-import pynput `
-    --hidden-import pynput.keyboard._win32 `
-    --hidden-import pynput.mouse._win32 `
-    "src\main.py"
+& $Python -m PyInstaller --noconfirm --clean "Whisper Anywhere.spec"
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
 
 Write-Host ""
 Write-Host "Build complete: dist\Whisper Anywhere\Whisper Anywhere.exe"

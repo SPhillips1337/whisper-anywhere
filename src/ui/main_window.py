@@ -60,7 +60,7 @@ FEATURE_ITEMS = [
     "Whisper model selector",
     "Model cards with install/download status",
     "Performance and hardware controls",
-    "Local transcription with faster-whisper",
+    "Local transcription with Whisper models or YapSnap CPU models",
     "Clipboard paste insertion into the focused app",
     "Restore previous clipboard after paste",
     "Start with Windows hidden in the tray",
@@ -111,11 +111,11 @@ class FirstRunSetupDialog(QDialog):
 
         self.model_combo = SafeComboBox()
         for info in parent.model_manager.models():
-            self.model_combo.addItem(info.name, info.name)
+            self.model_combo.addItem(info.label, info.name)
         parent._select_combo_data(
             self.model_combo, parent.model_manager.selected_model()
         )
-        form.addRow("Whisper model", self.model_combo)
+        form.addRow("Transcription model", self.model_combo)
 
         self.mic_combo = SafeComboBox()
         for device in parent.audio_recorder.list_input_devices():
@@ -539,7 +539,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(14)
 
         header = QHBoxLayout()
-        title = QLabel("Whisper Model")
+        title = QLabel("Transcription Model")
         title.setObjectName("sectionTitle")
         self.current_model_label = QLabel("Current model: base")
         self.current_model_label.setObjectName("accentLabel")
@@ -907,15 +907,16 @@ class MainWindow(QMainWindow):
 
     def _refresh_model_status(self) -> None:
         selected = self.model_manager.selected_model()
+        selected_label = self.model_manager.display_name(selected)
         if self.model_manager.is_model_ready(selected):
-            self.model_status.setText(f"Model ready: {selected}")
+            self.model_status.setText(f"Model ready: {selected_label}")
         elif bool(self.settings_manager.get("auto_download_models", True)):
             self.model_status.setText(
-                f"Model not prepared yet: {selected}. It will prepare when you use the shortcut."
+                f"Model not prepared yet: {selected_label}. It will prepare when you use the shortcut."
             )
         else:
             self.model_status.setText(
-                f"Model not prepared yet: {selected}. Click Prepare model now to download it."
+                f"Model not prepared yet: {selected_label}. Click Prepare model now to download it."
             )
         self._update_model_buttons(selected)
 
@@ -1045,12 +1046,32 @@ class MainWindow(QMainWindow):
                 continue
             button.setText(self._model_card_text(info))
             button.setChecked(info.name == selected)
-        self.current_model_label.setText(f"Current model: {selected}")
+        self.current_model_label.setText(
+            f"Current model: {self.model_manager.display_name(selected)}"
+        )
+        yapsnap_selected = selected == "yapsnap"
+        for control in (
+            self.performance_combo,
+            self.device_combo,
+            self.low_ram_checkbox,
+            self.low_vram_checkbox,
+            self.fallback_cpu_checkbox,
+            self.warn_large_checkbox,
+            self.use_gpu_checkbox,
+            self.compute_combo,
+            self.cpu_threads_combo,
+        ):
+            control.setEnabled(not yapsnap_selected)
+        self.hardware_note.setText(
+            "YapSnap is CPU-only; Whisper hardware settings are disabled."
+            if yapsnap_selected
+            else "Auto uses GPU when a compatible CUDA setup is available, otherwise CPU."
+        )
 
     def _model_card_text(self, info: WhisperModelInfo) -> str:
         status = self.model_manager.model_status_label(info.name)
         return (
-            f"{info.name} - {status}\n"
+            f"{info.label} - {status}\n"
             f"{info.approximate_size}\n"
             f"Speed: {info.speed_estimate} | Accuracy: {info.accuracy_estimate}\n"
             f"Resources: {info.resource_usage_estimate}\n"
@@ -1066,7 +1087,9 @@ class MainWindow(QMainWindow):
             return
         selected = self.model_manager.selected_model()
         if self.model_manager.is_model_ready():
-            self.model_status.setText(f"Model ready: {selected}")
+            self.model_status.setText(
+                f"Model ready: {self.model_manager.display_name(selected)}"
+            )
             self._update_model_buttons(selected)
             return
         if auto and not bool(self.settings_manager.get("auto_download_models", True)):
@@ -1081,7 +1104,7 @@ class MainWindow(QMainWindow):
             answer = QMessageBox.question(
                 self,
                 "Download Whisper model?",
-                "The selected Whisper model is missing. Download it now so voice typing can work?",
+                "The selected transcription model is missing. Download it now so voice typing can work?",
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
@@ -1099,7 +1122,7 @@ class MainWindow(QMainWindow):
         self.model_progress.setVisible(True)
         self.model_progress.setRange(0, 0)
         self.model_status.setText(
-            f"Preparing {selected} model. Downloading/loading may take several minutes the first time."
+            f"Preparing {self.model_manager.display_name(selected)}. Downloading/loading may take several minutes the first time."
         )
         self._model_progress_timer.start()
         settings = self.settings_manager.all()
@@ -1135,10 +1158,14 @@ class MainWindow(QMainWindow):
         self._update_model_buttons(model_name)
         message = self.transcriber.runtime_message
         if message:
-            self.model_status.setText(f"Model ready: {model_name}. {message}")
+            self.model_status.setText(
+                f"Model ready: {self.model_manager.display_name(model_name)}. {message}"
+            )
             self.set_status("Ready", message)
         else:
-            self.model_status.setText(f"Model ready: {model_name}")
+            self.model_status.setText(
+                f"Model ready: {self.model_manager.display_name(model_name)}"
+            )
             shortcut = str(self.settings_manager.get("shortcut", "Ctrl+Alt+Q"))
             self.set_status(
                 "Ready",
@@ -1168,7 +1195,7 @@ class MainWindow(QMainWindow):
         self.model_progress.setVisible(False)
         self._model_progress_timer.stop()
         self._reset_transcriber()
-        message = "Model preparation took too long and was cancelled. Switch to CPU / a smaller model, or try Prepare model now again."
+        message = "Model preparation took too long and was cancelled. Try again, check your network connection, or choose a smaller model."
         self._append_activity_log(f"model preparation timeout id={request_id}")
         self.model_status.setText(message)
         self.set_status("Error", message)
@@ -1180,7 +1207,7 @@ class MainWindow(QMainWindow):
         elapsed = int(max(0, time.monotonic() - self._model_prepare_started_at))
         selected = self.model_manager.selected_model()
         self.model_status.setText(
-            f"Preparing {selected} model... {elapsed}s elapsed. First download can be slow; shortcuts stay disabled until ready."
+            f"Preparing {self.model_manager.display_name(selected)}... {elapsed}s elapsed. First download can be slow; shortcuts stay disabled until ready."
         )
 
     def toggle_manual_listening(self) -> None:
@@ -1308,9 +1335,12 @@ class MainWindow(QMainWindow):
         request_id = self._transcription_request_id
         self._active_transcription_id = request_id
         self._append_activity_log(f"audio captured: {audio_path}")
-        self.set_status(
-            "Transcribing", "Local Whisper is turning your speech into text."
+        engine_description = (
+            "YapSnap CPU is turning your speech into text."
+            if self.model_manager.selected_model() == "yapsnap"
+            else "Local Whisper is turning your speech into text."
         )
+        self.set_status("Transcribing", engine_description)
         settings = self.settings_manager.all()
         self._start_transcription_timer(request_id, audio_path)
         threading.Thread(
@@ -1851,7 +1881,11 @@ class MainWindow(QMainWindow):
         mic_name = self.mic_combo.currentText() or "Default system microphone"
         shortcut = str(self.settings_manager.get("shortcut", "Ctrl+Alt+Q"))
         device = str(self.settings_manager.get("device", "auto"))
-        self.bottom_model.setText(f"Whisper: {model} ({device})")
+        self.bottom_model.setText(
+            self.model_manager.display_name(model)
+            if model == "yapsnap"
+            else f"Whisper: {model} ({device})"
+        )
         self.bottom_mic.setText(f"Mic: {mic_name}")
         self.bottom_shortcut.setText(f"Shortcut: {shortcut}")
         self.shortcut_reminder.setText(f"{self._mode_label()} {shortcut} to talk")

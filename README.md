@@ -2,6 +2,8 @@
 
 # Whisper Anywhere
 
+This public experimental fork adds **YapSnap (CPU)** alongside the existing Whisper models. It is based on [aSimpleLife-Lab/whisper-anywhere](https://github.com/aSimpleLife-Lab/whisper-anywhere) and uses [kouhxp/yapsnap](https://github.com/kouhxp/yapsnap). Build this fork with `scripts/build_exe.ps1` to try the YapSnap option; the upstream release linked below contains Whisper only.
+
 Whisper Anywhere is an early V1 native Windows 11 desktop/tray app for local voice typing. It uses `whisper` to transcribe speech on your PC, then pastes the result into the app you were using.
 
 Click in any app, hold `Ctrl + Alt + Q`, speak, release, and Whisper Anywhere transcribes your speech locally with the selected Whisper model.
@@ -12,7 +14,7 @@ This is not a web app and it does not use a cloud API in V1.
 
 The easiest way to try Whisper Anywhere is to download the prebuilt Windows release:
 
-**Download latest Windows build:** [Whisper-Anywhere-Windows.zip](https://github.com/aSimpleLife-Lab/whisper-anywhere/releases/download/v0.1.1/Whisper-Anywhere-Windows.zip)
+**Download upstream Windows build (Whisper only):** [Whisper-Anywhere-Windows.zip](https://github.com/aSimpleLife-Lab/whisper-anywhere/releases/download/v0.1.1/Whisper-Anywhere-Windows.zip)
 
 After downloading:
 
@@ -63,6 +65,7 @@ To launch automatically after reboot, open the app and enable **Start with Windo
 - Microphone selection
 - Local settings file at `%APPDATA%\Whisper Anywhere\settings.json`
 - Whisper model selector: `tiny`, `base`, `small`, `medium`, `large`, `large-v2`, `large-v3`, `turbo`
+- Experimental YapSnap CPU transcriber alongside the Whisper models
 - Model cards with Installed/Download status, speed, accuracy, resource estimate, and recommended use
 - Performance / Hardware controls for Auto, CPU Only, GPU Preferred, compute precision, presets, fallback, RAM/VRAM modes, and CPU threads
 - Performance changes defer heavy model preparation until the next shortcut use or **Prepare model now**
@@ -119,6 +122,14 @@ Advanced choices:
 - CPU threads: `Auto` or a manual thread count
 
 If GPU loading fails and CPU fallback is enabled, Whisper Anywhere shows a friendly message and continues on CPU.
+
+### Experimental YapSnap model
+
+Select **YapSnap (CPU)** in the transcription model cards to compare YapSnap's Kroko streaming transducer with the local Whisper models. The app passes its recorded PCM directly to YapSnap; the normal push-to-talk and paste flow stays the same. YapSnap downloads a shared language detector (~20 MB) and the selected language model on first use, then reuses them offline. The English model downloaded in the smoke check was about 149 MB.
+
+YapSnap currently supports German, English, Spanish, French, Italian, Hebrew, Dutch, Portuguese, Swedish, and Turkish. It does not include Japanese. Language identification is automatic and limited to those ten languages. GPU, Whisper precision, and Whisper model-size settings are disabled while YapSnap is selected because YapSnap runs on CPU.
+
+This is an experimental comparison option. Recognition quality depends on the speaker, microphone, and language; test both backends with the same recordings before choosing a default.
 
 ## Developer Setup From Source
 

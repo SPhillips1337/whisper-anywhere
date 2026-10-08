@@ -16,6 +16,11 @@ class WhisperModelInfo:
     accuracy_estimate: str
     resource_usage_estimate: str
     recommended_use: str
+    display_name: str = ""
+
+    @property
+    def label(self) -> str:
+        return self.display_name or self.name
 
 
 MODEL_ORDER = [
@@ -27,6 +32,7 @@ MODEL_ORDER = [
     "large-v2",
     "large-v3",
     "turbo",
+    "yapsnap",
 ]
 
 MODEL_INFO: dict[str, WhisperModelInfo] = {
@@ -96,6 +102,16 @@ MODEL_INFO: dict[str, WhisperModelInfo] = {
         "Moderate VRAM",
         "Fast high-quality dictation",
     ),
+    "yapsnap": WhisperModelInfo(
+        "yapsnap",
+        "yapsnap",
+        "~150 MB per language + detector",
+        "Very fast",
+        "Experimental",
+        "Low RAM; CPU only",
+        "Compare a fast CPU transcriber",
+        "YapSnap (CPU)",
+    ),
 }
 
 MODEL_ALIASES = {
@@ -111,6 +127,10 @@ class ModelManager:
 
     def models(self) -> list[WhisperModelInfo]:
         return [MODEL_INFO[name] for name in MODEL_ORDER]
+
+    def display_name(self, model_name: str | None = None) -> str:
+        selected = self.normalize_model_name(model_name or self.selected_model())
+        return MODEL_INFO[selected].label
 
     def normalize_model_name(self, model_name: str) -> str:
         return MODEL_ALIASES.get(model_name, model_name)

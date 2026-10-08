@@ -31,6 +31,13 @@ class Transcriber:
         return self.model_manager.is_model_ready()
 
     def prepare_selected_model(self, settings: dict[str, Any]) -> None:
+        if self.model_manager.selected_model() == "yapsnap":
+            from core.yapsnap_backend import YapSnapBackend
+
+            YapSnapBackend.prepare()
+            self.model_manager.mark_model_ready("yapsnap")
+            self.runtime_message = "YapSnap is ready. Transcription runs on CPU."
+            return
         try:
             self._load_model(settings)
             self.model_manager.mark_model_ready()
@@ -45,6 +52,13 @@ class Transcriber:
             self._model = None
             self._loaded_key = None
             return ""
+        if self.model_manager.selected_model() == "yapsnap":
+            from core.yapsnap_backend import YapSnapBackend
+
+            text = YapSnapBackend.transcribe(audio_path, settings)
+            self.model_manager.mark_model_ready("yapsnap")
+            self.runtime_message = "YapSnap CPU transcription."
+            return text
         try:
             model = self._load_model(settings)
             kwargs: dict[str, Any] = {

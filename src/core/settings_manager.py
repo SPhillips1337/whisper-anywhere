@@ -255,6 +255,7 @@ class SettingsManager:
             "large-v3",
             "turbo",
             "large-v3-turbo",
+            "yapsnap",
         }:
             normalized["selected_model"] = "base"
         if normalized.get("device") not in {"auto", "cpu", "gpu"}:

@@ -6,6 +6,10 @@ binaries = []
 hiddenimports = ['win32timezone', 'pynput', 'pynput.keyboard._win32', 'pynput.mouse._win32']
 tmp_ret = collect_all('faster_whisper')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('yapsnap')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('sherpa_onnx')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('ctranslate2')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('av')
@@ -29,6 +33,10 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# Qt uses the ICU library provided by Windows. A different icuuc.dll on
+# the build machine's PATH (for example Poppler's) can be collected instead,
+# then shadow the Windows library and prevent QtCore from loading.
+a.binaries = [entry for entry in a.binaries if entry[0].lower() != 'icuuc.dll']
 pyz = PYZ(a.pure)
 
 exe = EXE(
